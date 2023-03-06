@@ -48,7 +48,8 @@ public final class AddJmodResourcesPlugin extends AbstractPlugin {
     private static final String NAME = "add-jmod-resources";
     // This ought to be a package-less resource so as to not conflict with
     // packages listed in the module descriptors. Making it package-less ensures
-    // it works for any module, regardless of packages present.
+    // it works for any module, regardless of packages present. Used in
+    // JmodLessArchive
     private static final String RESPATH = "/%s/jmod_resources";
     private static final String TYPE_FILE_FORMAT = "%s|%s";
     private final Map<String, List<String>> nonClassResEntries;

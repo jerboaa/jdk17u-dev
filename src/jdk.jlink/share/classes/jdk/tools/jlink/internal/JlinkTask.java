@@ -579,7 +579,7 @@ public class JlinkTask {
 
         Map<String, Path> mods = cf.modules().stream()
             .collect(Collectors.toMap(ResolvedModule::name, JlinkTask::toPathLocation));
-        return new ImageHelper(cf, mods, config.getByteOrder(), retainModulesPath, ignoreSigning);
+        return new ImageHelper(cf, mods, config.getByteOrder(), retainModulesPath, ignoreSigning, config.useModulePath());
     }
 
     /*
@@ -798,7 +798,8 @@ public class JlinkTask {
                     Map<String, Path> modsPaths,
                     ByteOrder order,
                     Path packagedModulesPath,
-                    boolean ignoreSigning) throws IOException {
+                    boolean ignoreSigning,
+                    boolean useModulePath) throws IOException {
             this.order = order;
             this.packagedModulesPath = packagedModulesPath;
             this.ignoreSigning = ignoreSigning;
@@ -814,11 +815,11 @@ public class JlinkTask {
                 .orElse(Runtime.version());
 
             this.archives = modsPaths.entrySet().stream()
-                                .map(e -> newArchive(e.getKey(), e.getValue()))
+                                .map(e -> newArchive(e.getKey(), e.getValue(), useModulePath))
                                 .collect(Collectors.toSet());
         }
 
-        private Archive newArchive(String module, Path path) {
+        private Archive newArchive(String module, Path path, boolean useModulePath) {
             if (path.toString().endsWith(".jmod")) {
                 return new JmodArchive(module, path);
             } else if (path.toString().endsWith(".jar")) {
@@ -845,7 +846,7 @@ public class JlinkTask {
                 }
 
                 return modularJarArchive;
-            } else if (Files.isDirectory(path)) {
+            } else if (useModulePath && Files.isDirectory(path)) {
                 Path modInfoPath = path.resolve("module-info.class");
                 if (Files.isRegularFile(modInfoPath)) {
                     return new DirArchive(path, findModuleName(modInfoPath));
@@ -853,6 +854,9 @@ public class JlinkTask {
                     throw new IllegalArgumentException(
                         taskHelper.getMessage("err.not.a.module.directory", path));
                 }
+            } else if (ModuleFinder.ofSystem().find(module).isPresent()){
+                // the path is a JRTPath, when using a jmod-less image
+                return new JmodLessArchive(module, path);
             } else {
                 throw new IllegalArgumentException(
                     taskHelper.getMessage("err.not.modular.format", module, path));

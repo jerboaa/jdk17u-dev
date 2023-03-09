@@ -37,6 +37,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -105,17 +106,21 @@ public class JmodLessArchive implements Archive {
     }
 
     private void addNonClassResources() throws IOException {
-        String input = null;
-        try (InputStream inStream = ref.open().open(OTHER_RESOURCES_FILE).orElseThrow()) {
-            input = new String(inStream.readAllBytes(), StandardCharsets.UTF_8);
+        Optional<InputStream> jmodsResources = ref.open().open(OTHER_RESOURCES_FILE);
+        // Not all modules will have other resources like bin, lib, legal etc.
+        // files. In that case the file won't exist in the modules image.
+        if (jmodsResources.isPresent()) {
+            try (InputStream inStream = jmodsResources.get()) {
+                String input = new String(inStream.readAllBytes(), StandardCharsets.UTF_8);
+                files.addAll(Arrays.asList(input.split("\n")).stream()
+                        .map(s -> {
+                            TypePathPair pair = mappingResource(s);
+                            return new JmodLessFile(JmodLessArchive.this, pair.resPath, pair.resType);
+                        })
+                        .filter(m -> m != null)
+                        .collect(Collectors.toList()));
+            }
         }
-        files.addAll(Arrays.asList(input.split("\n")).stream()
-                .map(s -> {
-                    TypePathPair pair = mappingResource(s);
-                    return new JmodLessFile(JmodLessArchive.this, pair.resPath, pair.resType);
-                })
-                .filter(m -> m != null)
-                .collect(Collectors.toList()));
     }
 
     /**

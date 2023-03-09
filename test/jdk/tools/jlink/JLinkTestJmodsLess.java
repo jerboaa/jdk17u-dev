@@ -75,14 +75,21 @@ public class JLinkTestJmodsLess {
         // Now that the base image already includes the 'leaf1' module, it should
         // be possible to jlink it again, asking for *only* the 'leaf1' plugin even
         // though we won't have any jmods directories present.
-        jlinkUsingImage(helper, jlinkImage, customModule, List.of(customModule + ".com.foo.bar.X"));
+        List<String> expectedLocations = List.of(customModule + ".com.foo.bar.X");
+        String[] expectedFiles = new String[] {}; // no expected files in 'leaf1' module
+        jlinkUsingImage(helper, jlinkImage, customModule, expectedLocations, expectedFiles);
     }
 
     public static void testBasicJlinking(Helper helper) throws Exception {
         // create a base image only containing the jdk.jlink module and its transitive closure
         Path jlinkJmodlessImage = createBaseJlinkImage(helper, "jdk-jlink", List.of("jdk.jlink"));
 
-        jlinkUsingImage(helper, jlinkJmodlessImage, "java.base", List.of("java.lang.String"));
+        // Expect java.lang.String class
+        List<String> expectedLocations = List.of("java.lang.String");
+        Path libjvm = Path.of("lib", "server", System.mapLibraryName("jvm"));
+        // And expect libjvm (not part of the jimage) to be present in the resulting image
+        String[] expectedFiles = new String[] { libjvm.toString() };
+        jlinkUsingImage(helper, jlinkJmodlessImage, "java.base", expectedLocations, expectedFiles);
         System.out.println("testBasicJlinking PASSED!");
     }
 
@@ -110,7 +117,8 @@ public class JLinkTestJmodsLess {
     private static void jlinkUsingImage(Helper helper,
                                         Path jmodsLessImage,
                                         String module,
-                                        List<String> expectedLocations) throws Exception {
+                                        List<String> expectedLocations,
+                                        String[] expectedFiles) throws Exception {
         String jmodLessGeneratedImage = "target-jmodless-" + module;
         Path targetImageDir = helper.createNewImageDir(jmodLessGeneratedImage);
         Path targetJlink = jmodsLessImage.resolve("bin").resolve(getJlink());
@@ -143,7 +151,7 @@ public class JLinkTestJmodsLess {
 
         // validate the resulting image; Includes running 'java -version'
         JImageValidator validator = new JImageValidator(module, expectedLocations,
-                targetImageDir.toFile(), Collections.emptyList(), Collections.emptyList());
+                targetImageDir.toFile(), Collections.emptyList(), Collections.emptyList(), expectedFiles);
         validator.validate();
     }
 

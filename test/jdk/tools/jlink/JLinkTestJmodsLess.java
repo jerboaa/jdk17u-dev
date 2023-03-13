@@ -77,7 +77,12 @@ public class JLinkTestJmodsLess {
         // though we won't have any jmods directories present.
         List<String> expectedLocations = List.of(customModule + ".com.foo.bar.X");
         String[] expectedFiles = new String[] {}; // no expected files in 'leaf1' module
-        jlinkUsingImage(helper, jlinkImage, customModule, expectedLocations, expectedFiles);
+        Path finalImage = jlinkUsingImage(helper, jlinkImage, customModule, expectedLocations, expectedFiles);
+        // Expected only the transitive closure of "leaf1" module in the --list-modules
+        // output of the java launcher.
+        List<String> expectedModules = List.of("java.base", customModule);
+        verifyListModules(finalImage, expectedModules);
+        System.out.println("testCustomModuleJlinking PASSED!");
     }
 
     public static void testBasicJlinking(Helper helper) throws Exception {
@@ -89,8 +94,51 @@ public class JLinkTestJmodsLess {
         Path libjvm = Path.of("lib", "server", System.mapLibraryName("jvm"));
         // And expect libjvm (not part of the jimage) to be present in the resulting image
         String[] expectedFiles = new String[] { libjvm.toString() };
-        jlinkUsingImage(helper, jlinkJmodlessImage, "java.base", expectedLocations, expectedFiles);
+        Path finalImage = jlinkUsingImage(helper, jlinkJmodlessImage, "java.base", expectedLocations, expectedFiles);
+        verifyListModules(finalImage, List.of("java.base"));
         System.out.println("testBasicJlinking PASSED!");
+    }
+
+    /**
+     * Ensure 'java --list-modules' lists the correct set of modules in the given
+     * image.
+     *
+     * @param jlinkImage
+     * @param expectedModules
+     */
+    private static void verifyListModules(Path image,
+            List<String> expectedModules) throws Exception {
+        Path targetJava = image.resolve("bin").resolve(getJava());
+        String[] cmdArr = new String[] {
+                targetJava.toString(),
+                "--list-modules"
+        };
+        List<String> javaCmd = Arrays.asList(cmdArr);
+        ProcessBuilder builder = new ProcessBuilder(javaCmd);
+        Process p = builder.start();
+        BufferedReader errReader = p.errorReader();
+        BufferedReader outReader = p.inputReader();
+        int status = p.waitFor();
+        if (status != 0) {
+            if (DEBUG) {
+                readAndPrintReaders(errReader, outReader);
+            }
+            throw new AssertionError("'java --list-modules' expected to succeed!");
+        }
+        List<String> actual = parseListMods(outReader);
+        Collections.sort(actual);
+        if (!expectedModules.equals(actual)) {
+            throw new AssertionError("Different modules! Expected " + expectedModules + " got: " + actual);
+        }
+    }
+
+    private static List<String> parseListMods(BufferedReader outReader) throws Exception {
+        try (outReader) {
+            return outReader.lines()
+                    .map(a -> { return a.split("@", 2)[0];})
+                    .filter(a -> !a.isBlank())
+                    .collect(Collectors.toList());
+        }
     }
 
     private static Path createBaseJlinkImage(Helper helper, String name, List<String> modules) throws Exception {
@@ -114,7 +162,7 @@ public class JLinkTestJmodsLess {
         return jlinkJmodlessImage;
     }
 
-    private static void jlinkUsingImage(Helper helper,
+    private static Path jlinkUsingImage(Helper helper,
                                         Path jmodsLessImage,
                                         String module,
                                         List<String> expectedLocations,
@@ -130,8 +178,7 @@ public class JLinkTestJmodsLess {
                 // For the time being generate-jli-classes and system-modules
                 // plugins are not supported as they've been generated for the base
                 // image already.
-                "--disable-plugin", "generate-jli-classes",
-                "--disable-plugin", "system-modules"
+                "--disable-plugin", "generate-jli-classes"
         };
         List<String> jlinkCmd = Arrays.asList(jlinkCmdArray);
         System.out.println("DEBUG: jmod-less jlink command: " + jlinkCmd.stream().collect(
@@ -153,6 +200,7 @@ public class JLinkTestJmodsLess {
         JImageValidator validator = new JImageValidator(module, expectedLocations,
                 targetImageDir.toFile(), Collections.emptyList(), Collections.emptyList(), expectedFiles);
         validator.validate();
+        return targetImageDir;
     }
 
     private static void readAndPrintReaders(BufferedReader errReader,
@@ -164,8 +212,17 @@ public class JLinkTestJmodsLess {
     }
 
     private static String getJlink() {
-        return isWindows() ? "jlink.exe" : "jlink";
+        return getBinary("jlink");
     }
+
+    private static String getJava() {
+        return getBinary("java");
+    }
+
+    private static String getBinary(String binary) {
+        return isWindows() ? binary + ".exe" : binary;
+    }
+
     private static boolean isWindows() {
         return System.getProperty("os.name").startsWith("Windows");
     }

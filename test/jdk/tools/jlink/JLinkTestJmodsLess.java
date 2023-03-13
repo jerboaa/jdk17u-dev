@@ -62,6 +62,7 @@ public class JLinkTestJmodsLess {
 
         testBasicJlinking(helper);
         testCustomModuleJlinking(helper);
+        testJlinkJavaSEReproducible(helper);
     }
 
     public static void testCustomModuleJlinking(Helper helper) throws Exception {
@@ -86,17 +87,38 @@ public class JLinkTestJmodsLess {
     }
 
     public static void testBasicJlinking(Helper helper) throws Exception {
+        Path finalImage = createJavaBaseJmodLess(helper, "java-base");
+        verifyListModules(finalImage, List.of("java.base"));
+        System.out.println("testBasicJlinking PASSED!");
+    }
+
+    public static void testJlinkJavaSEReproducible(Helper helper) throws Exception {
+        // create a java.se using jmod-less approach
+        Path javaSEJmodLess1 = createJavaImageJmodLess(helper, "java-se-repro1", "java.se");
+
+        // create another java.se version using jmod-less approach
+        Path javaSEJmodLess2 = createJavaImageJmodLess(helper, "java-se-repro2", "java.se");
+        if (Files.mismatch(javaSEJmodLess1.resolve("lib").resolve("modules"),
+                           javaSEJmodLess2.resolve("lib").resolve("modules")) != -1L) {
+            throw new RuntimeException("jlink producing inconsistent result for java.se (jmod-less)");
+        }
+        System.out.println("testJlinkJavaSEReproducible PASSED!");
+    }
+
+    private static Path createJavaImageJmodLess(Helper helper, String name, String module) throws Exception {
         // create a base image only containing the jdk.jlink module and its transitive closure
-        Path jlinkJmodlessImage = createBaseJlinkImage(helper, "jdk-jlink", List.of("jdk.jlink"));
+        Path jlinkJmodlessImage = createBaseJlinkImage(helper, name + "-jlink", List.of("jdk.jlink", module));
 
         // Expect java.lang.String class
         List<String> expectedLocations = List.of("java.lang.String");
         Path libjvm = Path.of("lib", "server", System.mapLibraryName("jvm"));
         // And expect libjvm (not part of the jimage) to be present in the resulting image
         String[] expectedFiles = new String[] { libjvm.toString() };
-        Path finalImage = jlinkUsingImage(helper, jlinkJmodlessImage, "java.base", expectedLocations, expectedFiles);
-        verifyListModules(finalImage, List.of("java.base"));
-        System.out.println("testBasicJlinking PASSED!");
+        return jlinkUsingImage(helper, jlinkJmodlessImage, name, module, expectedLocations, expectedFiles);
+    }
+
+    private static Path createJavaBaseJmodLess(Helper helper, String name) throws Exception {
+        return createJavaImageJmodLess(helper, name, "java.base");
     }
 
     /**
@@ -167,7 +189,16 @@ public class JLinkTestJmodsLess {
                                         String module,
                                         List<String> expectedLocations,
                                         String[] expectedFiles) throws Exception {
-        String jmodLessGeneratedImage = "target-jmodless-" + module;
+        return jlinkUsingImage(helper, jmodsLessImage, module, module, expectedLocations, expectedFiles);
+    }
+
+    private static Path jlinkUsingImage(Helper helper,
+                                        Path jmodsLessImage,
+                                        String name,
+                                        String module,
+                                        List<String> expectedLocations,
+                                        String[] expectedFiles) throws Exception {
+        String jmodLessGeneratedImage = "target-jmodless-" + name;
         Path targetImageDir = helper.createNewImageDir(jmodLessGeneratedImage);
         Path targetJlink = jmodsLessImage.resolve("bin").resolve(getJlink());
         String[] jlinkCmdArray = new String[] {

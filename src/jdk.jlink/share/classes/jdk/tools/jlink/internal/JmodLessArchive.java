@@ -37,6 +37,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -77,7 +78,9 @@ public class JmodLessArchive implements Archive {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        return files.stream().map(f -> { return f.toEntry();});
+        return files.stream()
+                    .sorted((a, b) -> {return a.resPath.compareTo(b.resPath);})
+                    .map(f -> { return f.toEntry();});
     }
 
     @Override
@@ -92,6 +95,22 @@ public class JmodLessArchive implements Archive {
         if (!files.isEmpty()) {
             files.clear();
         }
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(module, path);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof JmodLessArchive) {
+            JmodLessArchive other = (JmodLessArchive)obj;
+            return Objects.equals(module, other.module) &&
+                   Objects.equals(path, other.path);
+        }
+
+        return false;
     }
 
     private void collectFiles() throws IOException {

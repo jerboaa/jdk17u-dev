@@ -174,11 +174,7 @@ public class JLinkTestJmodsLess {
                 targetJlink.toString(),
                 "--output", targetImageDir.toString(),
                 "--verbose",
-                "--add-modules", module,
-                // For the time being generate-jli-classes and system-modules
-                // plugins are not supported as they've been generated for the base
-                // image already.
-                "--disable-plugin", "generate-jli-classes"
+                "--add-modules", module
         };
         List<String> jlinkCmd = Arrays.asList(jlinkCmdArray);
         System.out.println("DEBUG: jmod-less jlink command: " + jlinkCmd.stream().collect(

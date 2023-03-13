@@ -62,7 +62,24 @@ import jdk.tools.jlink.plugin.ResourcePoolEntry;
  */
 public final class GenerateJLIClassesPlugin extends AbstractPlugin {
 
-
+    // Work-around for jmod-less jlinking. jmod archives don't contain these
+    // classes so it isn't an issue for a jmod-full jlink.
+    private static final Set<String> GENERATED_JAVA_BASE_CLASSES = Set.of(
+            "java/lang/invoke/BoundMethodHandle$Species_D",
+            "java/lang/invoke/BoundMethodHandle$Species_DL",
+            "java/lang/invoke/BoundMethodHandle$Species_I",
+            "java/lang/invoke/BoundMethodHandle$Species_IL",
+            "java/lang/invoke/BoundMethodHandle$Species_LJ",
+            "java/lang/invoke/BoundMethodHandle$Species_LL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLJ",
+            "java/lang/invoke/BoundMethodHandle$Species_LLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLJ",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLL");
     private static final String DEFAULT_TRACE_FILE = "default_jli_trace.txt";
 
     private static final JavaLangInvokeAccess JLIA
@@ -143,9 +160,11 @@ public final class GenerateJLIClassesPlugin extends AbstractPlugin {
             try {
                 JLIA.generateHolderClasses(traceFileStream)
                     .forEach((cn, bytes) -> {
-                        String entryName = "/java.base/" + cn + ".class";
-                        ResourcePoolEntry ndata = ResourcePoolEntry.create(entryName, bytes);
-                        out.add(ndata);
+                        if (!GENERATED_JAVA_BASE_CLASSES.contains(cn)) {
+                            String entryName = "/java.base/" + cn + ".class";
+                            ResourcePoolEntry ndata = ResourcePoolEntry.create(entryName, bytes);
+                            out.add(ndata);
+                        }
                     });
             } catch (Exception ex) {
                 throw new PluginException(ex);

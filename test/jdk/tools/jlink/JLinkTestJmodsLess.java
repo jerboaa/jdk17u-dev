@@ -24,10 +24,12 @@
 import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import tests.Helper;
 import tests.JImageGenerator;
@@ -63,6 +65,26 @@ public class JLinkTestJmodsLess {
         testBasicJlinking(helper);
         testCustomModuleJlinking(helper);
         testJlinkJavaSEReproducible(helper);
+        testAddOptions(helper);
+    }
+
+    public static void testAddOptions(Helper helper) throws Exception {
+        List<String> extraOpts = List.of("--add-options", "-Xlog:gc=info:stderr -XX:+UseParallelGC");
+        Path finalImage = createJavaImageJmodLess(helper, "java-base-with-opts", "java.base", extraOpts);
+        verifyListModules(finalImage, List.of("java.base"));
+        verifyParallelGCInUse(finalImage);
+        System.out.println("testAddOptions PASSED!");
+
+    }
+
+    private static void verifyParallelGCInUse(Path finalImage) throws Exception {
+        Process p = runJavaCmd(finalImage, List.of("--version"));
+        BufferedReader buf = p.errorReader();
+        try (Stream<String> lines = buf.lines()) {
+            if (!lines.anyMatch(l -> l.endsWith("Using Parallel"))) {
+                throw new AssertionError("Expected Parallel GC in place for jlinked image");
+            }
+        }
     }
 
     public static void testCustomModuleJlinking(Helper helper) throws Exception {
@@ -106,15 +128,19 @@ public class JLinkTestJmodsLess {
     }
 
     private static Path createJavaImageJmodLess(Helper helper, String name, String module) throws Exception {
+        return createJavaImageJmodLess(helper, name, module, null);
+    }
+
+    private static Path createJavaImageJmodLess(Helper helper, String name, String module, List<String> extraOptions) throws Exception {
         // create a base image only containing the jdk.jlink module and its transitive closure
-        Path jlinkJmodlessImage = createBaseJlinkImage(helper, name + "-jlink", List.of("jdk.jlink", module));
+        Path jlinkJmodlessImage = createBaseJlinkImage(helper, name + "-jlink", List.of("jdk.jlink", module), extraOptions);
 
         // Expect java.lang.String class
         List<String> expectedLocations = List.of("java.lang.String");
         Path libjvm = Path.of("lib", "server", System.mapLibraryName("jvm"));
         // And expect libjvm (not part of the jimage) to be present in the resulting image
         String[] expectedFiles = new String[] { libjvm.toString() };
-        return jlinkUsingImage(helper, jlinkJmodlessImage, name, module, expectedLocations, expectedFiles);
+        return jlinkUsingImage(helper, jlinkJmodlessImage, name, module, expectedLocations, expectedFiles, extraOptions);
     }
 
     private static Path createJavaBaseJmodLess(Helper helper, String name) throws Exception {
@@ -130,12 +156,23 @@ public class JLinkTestJmodsLess {
      */
     private static void verifyListModules(Path image,
             List<String> expectedModules) throws Exception {
+        Process javaListMods = runJavaCmd(image, List.of("--list-modules"));
+        BufferedReader outReader = javaListMods.inputReader();
+        List<String> actual = parseListMods(outReader);
+        Collections.sort(actual);
+        if (!expectedModules.equals(actual)) {
+            throw new AssertionError("Different modules! Expected " + expectedModules + " got: " + actual);
+        }
+    }
+
+    private static Process runJavaCmd(Path image, List<String> options) throws Exception {
         Path targetJava = image.resolve("bin").resolve(getJava());
-        String[] cmdArr = new String[] {
-                targetJava.toString(),
-                "--list-modules"
-        };
-        List<String> javaCmd = Arrays.asList(cmdArr);
+        List<String> cmd = new ArrayList<>();
+        cmd.add(targetJava.toString());
+        for (String opt: options) {
+            cmd.add(opt);
+        }
+        List<String> javaCmd = Collections.unmodifiableList(cmd);
         ProcessBuilder builder = new ProcessBuilder(javaCmd);
         Process p = builder.start();
         BufferedReader errReader = p.errorReader();
@@ -145,13 +182,10 @@ public class JLinkTestJmodsLess {
             if (DEBUG) {
                 readAndPrintReaders(errReader, outReader);
             }
-            throw new AssertionError("'java --list-modules' expected to succeed!");
+            throw new AssertionError("'" + javaCmd.stream().collect(Collectors.joining(" ")) + "'"
+                    + " expected to succeed!");
         }
-        List<String> actual = parseListMods(outReader);
-        Collections.sort(actual);
-        if (!expectedModules.equals(actual)) {
-            throw new AssertionError("Different modules! Expected " + expectedModules + " got: " + actual);
-        }
+        return p;
     }
 
     private static List<String> parseListMods(BufferedReader outReader) throws Exception {
@@ -164,6 +198,10 @@ public class JLinkTestJmodsLess {
     }
 
     private static Path createBaseJlinkImage(Helper helper, String name, List<String> modules) throws Exception {
+        return createBaseJlinkImage(helper, name, modules, null);
+    }
+
+    private static Path createBaseJlinkImage(Helper helper, String name, List<String> modules, List<String> extraOpts) throws Exception {
         // Jlink an image including jdk.jlink (i.e. the jlink tool). The
         // result must not contain a jmods directory.
         Path jlinkJmodlessImage = helper.createNewImageDir(name);
@@ -174,6 +212,11 @@ public class JLinkTestJmodsLess {
         task.output(jlinkJmodlessImage);
         for (String module: modules) {
             task.addMods(module);
+        }
+        if (extraOpts != null) {
+            for (String opt: extraOpts) {
+                task.option(opt);
+            }
         }
         task.option("--verbose")
             .call().assertSuccess();
@@ -193,11 +236,21 @@ public class JLinkTestJmodsLess {
     }
 
     private static Path jlinkUsingImage(Helper helper,
+            Path jmodsLessImage,
+            String name,
+            String module,
+            List<String> expectedLocations,
+            String[] expectedFiles) throws Exception {
+        return jlinkUsingImage(helper, jmodsLessImage, name, module, expectedLocations, expectedFiles, null);
+    }
+
+    private static Path jlinkUsingImage(Helper helper,
                                         Path jmodsLessImage,
                                         String name,
                                         String module,
                                         List<String> expectedLocations,
-                                        String[] expectedFiles) throws Exception {
+                                        String[] expectedFiles,
+                                        List<String> extraJlinkOptions) throws Exception {
         String jmodLessGeneratedImage = "target-jmodless-" + name;
         Path targetImageDir = helper.createNewImageDir(jmodLessGeneratedImage);
         Path targetJlink = jmodsLessImage.resolve("bin").resolve(getJlink());
@@ -207,7 +260,12 @@ public class JLinkTestJmodsLess {
                 "--verbose",
                 "--add-modules", module
         };
-        List<String> jlinkCmd = Arrays.asList(jlinkCmdArray);
+        List<String> jlinkCmd = new ArrayList<>();
+        jlinkCmd.addAll(Arrays.asList(jlinkCmdArray));
+        if (extraJlinkOptions != null && !extraJlinkOptions.isEmpty()) {
+            jlinkCmd.addAll(extraJlinkOptions);
+        }
+        jlinkCmd = Collections.unmodifiableList(jlinkCmd); // freeze
         System.out.println("DEBUG: jmod-less jlink command: " + jlinkCmd.stream().collect(
                                                     Collectors.joining(" ")));
         ProcessBuilder builder = new ProcessBuilder(jlinkCmd);

@@ -77,16 +77,6 @@ public class JLinkTestJmodsLess {
 
     }
 
-    private static void verifyParallelGCInUse(Path finalImage) throws Exception {
-        Process p = runJavaCmd(finalImage, List.of("--version"));
-        BufferedReader buf = p.errorReader();
-        try (Stream<String> lines = buf.lines()) {
-            if (!lines.anyMatch(l -> l.endsWith("Using Parallel"))) {
-                throw new AssertionError("Expected Parallel GC in place for jlinked image");
-            }
-        }
-    }
-
     public static void testCustomModuleJlinking(Helper helper) throws Exception {
         String customModule = "leaf1";
         helper.generateDefaultJModule(customModule);
@@ -125,6 +115,16 @@ public class JLinkTestJmodsLess {
             throw new RuntimeException("jlink producing inconsistent result for java.se (jmod-less)");
         }
         System.out.println("testJlinkJavaSEReproducible PASSED!");
+    }
+
+    private static void verifyParallelGCInUse(Path finalImage) throws Exception {
+        Process p = runJavaCmd(finalImage, List.of("--version"));
+        BufferedReader buf = p.errorReader();
+        try (Stream<String> lines = buf.lines()) {
+            if (!lines.anyMatch(l -> l.endsWith("Using Parallel"))) {
+                throw new AssertionError("Expected Parallel GC in place for jlinked image");
+            }
+        }
     }
 
     private static Path createJavaImageJmodLess(Helper helper, String name, String module) throws Exception {

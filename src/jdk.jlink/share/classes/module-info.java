@@ -74,6 +74,7 @@ module jdk.jlink {
         jdk.tools.jlink.internal.plugins.GenerateJLIClassesPlugin,
         jdk.tools.jlink.internal.plugins.ReleaseInfoPlugin,
         jdk.tools.jlink.internal.plugins.AddOptionsPlugin,
+        jdk.tools.jlink.internal.plugins.AddJmodResourcesPlugin,
         jdk.tools.jlink.internal.plugins.VendorBugURLPlugin,
         jdk.tools.jlink.internal.plugins.VendorVMBugURLPlugin,
         jdk.tools.jlink.internal.plugins.VendorVersionPlugin;

@@ -79,7 +79,11 @@ public final class GenerateJLIClassesPlugin extends AbstractPlugin {
             "java/lang/invoke/BoundMethodHandle$Species_LLLLLL",
             "java/lang/invoke/BoundMethodHandle$Species_LLLLLLL",
             "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLL",
-            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLL");
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLLLLL",
+            "java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLLLLLL");
     private static final String DEFAULT_TRACE_FILE = "default_jli_trace.txt";
 
     private static final JavaLangInvokeAccess JLIA

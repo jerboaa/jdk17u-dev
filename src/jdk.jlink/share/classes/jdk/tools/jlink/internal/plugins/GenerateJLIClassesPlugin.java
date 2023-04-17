@@ -31,6 +31,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -142,6 +143,7 @@ public final class GenerateJLIClassesPlugin extends AbstractPlugin {
     @Override
     public ResourcePool transform(ResourcePool in, ResourcePoolBuilder out) {
         initialize(in);
+        final Set<String> containedClasses = new HashSet<>();
         // Copy all but DMH_ENTRY to out
         in.transformAndCopy(entry -> {
                 // No trace file given.  Copy all entries.
@@ -155,6 +157,11 @@ public final class GenerateJLIClassesPlugin extends AbstractPlugin {
                     path.equals(BASIC_FORMS_HOLDER_ENTRY)) {
                     return null;
                 } else {
+                    // Keep track of generated JLI classes
+                    String className = possiblyStripFromPath(path);
+                    if (GENERATED_JAVA_BASE_CLASSES.contains(className)) {
+                        containedClasses.add(className);
+                    }
                     return entry;
                 }
             }, out);
@@ -164,7 +171,11 @@ public final class GenerateJLIClassesPlugin extends AbstractPlugin {
             try {
                 JLIA.generateHolderClasses(traceFileStream)
                     .forEach((cn, bytes) -> {
-                        if (!GENERATED_JAVA_BASE_CLASSES.contains(cn)) {
+                        // containedClasses will not contain any generated JLI
+                        // classes for the initial link, but will contain all
+                        // JLI classes in GENERATED_JAVA_BASE_CLASSES in the
+                        // recursive jmodless jlink case.
+                        if (!containedClasses.contains(cn)) {
                             String entryName = "/java.base/" + cn + ".class";
                             ResourcePoolEntry ndata = ResourcePoolEntry.create(entryName, bytes);
                             out.add(ndata);
@@ -175,6 +186,13 @@ public final class GenerateJLIClassesPlugin extends AbstractPlugin {
             }
         }
         return out.build();
+    }
+
+    private static String possiblyStripFromPath(String path) {
+        if (path.startsWith("/java.base/") && path.endsWith(".class")) {
+            return path.substring("/java.base/".length(), path.length() - ".class".length());
+        }
+        return path;
     }
 
     private static final String DIRECT_METHOD_HOLDER_ENTRY =

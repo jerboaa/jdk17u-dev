@@ -151,15 +151,17 @@ public class GenerateJLIClassesPluginTest {
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_IL.class",
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_LJ.class",
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_LL.class",
-                        "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLJ.class",
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLL.class",
-                        "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLJ.class",
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLL.class",
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLL.class",
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLL.class",
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLLL.class",
                         "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLLLL.class",
-                        "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLL.class"),
+                        "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLL.class",
+                        "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLLL.class",
+                        "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLLLL.class",
+                        "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLLLLL.class",
+                        "/java.base/java/lang/invoke/BoundMethodHandle$Species_LLLLLLLLLLLLL.class"),
                 List.of());
     }
 

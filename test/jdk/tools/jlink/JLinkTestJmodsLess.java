@@ -137,7 +137,8 @@ public class JLinkTestJmodsLess {
 
         // Expect java.lang.String class
         List<String> expectedLocations = List.of("java.lang.String");
-        Path libjvm = Path.of("lib", "server", System.mapLibraryName("jvm"));
+        // On Windows jvm.dll is in 'bin' after the jlink
+        Path libjvm = Path.of((isWindows() ? "bin" : "lib"), "server", System.mapLibraryName("jvm"));
         // And expect libjvm (not part of the jimage) to be present in the resulting image
         String[] expectedFiles = new String[] { libjvm.toString() };
         return jlinkUsingImage(helper, jlinkJmodlessImage, name, module, expectedLocations, expectedFiles, extraOptions);

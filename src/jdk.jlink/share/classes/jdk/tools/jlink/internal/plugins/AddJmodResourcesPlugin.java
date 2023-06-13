@@ -27,6 +27,7 @@ package jdk.tools.jlink.internal.plugins;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -83,16 +84,23 @@ public final class AddJmodResourcesPlugin extends AbstractPlugin {
     }
 
     private void addModuleResourceEntries(ResourcePoolBuilder out) {
-        for (String module: nonClassResEntries.keySet()) {
+        for (String module: keysInSortedOrder()) {
             String mResource = String.format(RESPATH, module);
             List<String> mResources = nonClassResEntries.get(module);
             if (mResources == null) {
                 throw new AssertionError("Module listed, but no resources?");
             }
-            String mResContent = mResources.stream().collect(Collectors.joining("\n"));
+            String mResContent = mResources.stream().sorted().collect(Collectors.joining("\n"));
             out.add(ResourcePoolEntry.create(mResource,
                     mResContent.getBytes(StandardCharsets.UTF_8)));
         }
+    }
+
+    private List<String> keysInSortedOrder() {
+        List<String> keys = new ArrayList<>();
+        keys.addAll(nonClassResEntries.keySet());
+        Collections.sort(keys);
+        return keys;
     }
 
     private ResourcePoolEntry recordAndFilterEntry(ResourcePoolEntry entry, Platform platform) {
